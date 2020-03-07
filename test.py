@@ -175,14 +175,14 @@ def query_secondray_index():
         else:
             break
 
-# When making a Query call, you use the KeyConditionExpression parameter to specify the hash key on which you want to query.
-# If you want to use a specific index, you also need to pass the IndexName in our API call.
-resp = table.query(
-                   # Add the name of the index you want to use in your query.
-                   IndexName="BikenumberIndex",
-                   KeyConditionExpression=Key('Bikenumber').eq('W00771'),
-                   )
-    
+    # When making a Query call, you use the KeyConditionExpression parameter to specify the hash key on which you want to query.
+    # If you want to use a specific index, you also need to pass the IndexName in our API call.
+    resp = table.query(
+                       # Add the name of the index you want to use in your query.
+                       IndexName="BikenumberIndex",
+                       KeyConditionExpression=Key('Bikenumber').eq('W00771'),
+                       )
+        
     print("The query returned the following items:")
     for item in resp['Items']:
         print(item)
