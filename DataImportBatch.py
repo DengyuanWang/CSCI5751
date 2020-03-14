@@ -7,8 +7,9 @@ from botocore.exceptions import ClientError
 import decimal
 import csv
 from datetime import datetime
+import argparse
 
-Use_Local_Batch = True
+
 '''
 thisdict = {
   "brand": "Ford",
@@ -19,35 +20,37 @@ thisdict["color"] = "red"
 print(thisdict)
 
 '''
-PrevKEY = [];
-LastRecord_tag = False;
-Helper_Table_dict = {}
+
+
 
 def create_MINMAX_duration(helper_table,Duration,KEY):
+    global PrevKEY,LastRecord_tag,Helper_Table_dict
     KEY = KEY+"MINMAX"
     if Use_Local_Batch:
         items= Helper_Table_dict.get(KEY)
         if not items:
-                Item={
-                      'Key': KEY,
-                      'Value': "["+Duration+"]["+Duration+"]",
-                      'MIN_': int(Duration),
-                      'MAX_': int(Duration),
-                      'Exist': "Exist"
-                      }
-                Helper_Table_dict[KEY] = Item
-                if PrevKEY:
-                    PrevItem = Helper_Table_dict[PrevKEY+"MINMAX"]
-                    helper_table.put_item(
-                                  Item={
-                                  'Key': PrevKEY+"MINMAX",
-                                  'Value': PrevItem["Value"],
-                                  'MIN_': PrevItem["MIN_"],
-                                  'MAX_': PrevItem["MAX_"],
-                                  'Exist': "Exist"
-                                  }
-                                  )
+            print(KEY)
+            Item={
+                  'Key': KEY,
+                  'Value': "["+Duration+"]["+Duration+"]",
+                  'MIN_': int(Duration),
+                  'MAX_': int(Duration),
+                  'Exist': "Exist"
+                  }
+            Helper_Table_dict[KEY] = Item
+            if PrevKEY:
+                PrevItem = Helper_Table_dict[PrevKEY+"MINMAX"]
+                helper_table.put_item(
+                              Item={
+                              'Key': PrevKEY+"MINMAX",
+                              'Value': PrevItem["Value"],
+                              'MIN_': PrevItem["MIN_"],
+                              'MAX_': PrevItem["MAX_"],
+                              'Exist': "Exist"
+                              }
+                              )
         else:
+            
             MIN_ = items['MIN_']
             MAX_ = items['MAX_']
             dur = int(Duration)
@@ -76,6 +79,7 @@ def create_MINMAX_duration(helper_table,Duration,KEY):
     else:               
         items = helper_table.query(KeyConditionExpression=Key('Key').eq(KEY))['Items']
         if not items:
+            print(KEY)
             #this month not exists yet
             helper_table.put_item(
                                   Item={
@@ -113,6 +117,7 @@ def create_MINMAX_duration(helper_table,Duration,KEY):
                                          )
 
 def create_record_counts(helper_table,Duration,KEY,Cur_index):
+    global PrevKEY,LastRecord_tag,Helper_Table_dict
     KEY = KEY+"RecordsCounts"
     if Use_Local_Batch:
         items= Helper_Table_dict.get(KEY)
@@ -125,6 +130,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                       'Exist': "Exist"
                       }
                 Helper_Table_dict[KEY] = Item
+                print("record{}".format(PrevKEY))
                 if PrevKEY:
                     PrevItem = Helper_Table_dict[PrevKEY+"RecordsCounts"]
                     helper_table.put_item(
@@ -146,6 +152,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                                              },
                                              ReturnValues="UPDATED_NEW"
                                              )
+                    print("loaded last id is {}\n".format(PrevItem["lastid"]))
         else:
             firstid = items['firstid']
             Item={
@@ -168,6 +175,17 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                           'Exist': "Exist"
                           }
                           )
+            helper_table.update_item(
+                                     Key={
+                                     'Key': 'LastLoadedIndex'
+                                     },
+                                     UpdateExpression="set NValue = :val",
+                                     ExpressionAttributeValues={
+                                     ':val': CurItem["lastid"]
+                                     },
+                                     ReturnValues="UPDATED_NEW"
+                                     )
+            print("loaded last id is {}\n".format(PrevItem["lastid"]))
     else:
         items = helper_table.query(KeyConditionExpression=Key('Key').eq(KEY))['Items']
         if not items:
@@ -201,6 +219,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                                      )
 
 def create_MembershipDistribution(helper_table,Duration,KEY,Membertype):
+    global PrevKEY,LastRecord_tag,Helper_Table_dict
     ismember = False
     if Membertype=="Member":
         ismember = True
@@ -312,6 +331,7 @@ def create_MembershipDistribution(helper_table,Duration,KEY,Membertype):
                                      )
 
 def load_BikeSharing_record(helper_table,table,record,Cur_index):
+    global PrevKEY,LastRecord_tag,Helper_Table_dict
     Index = Cur_index
     Duration = record['Duration']
     Startdate = record['Start date']
@@ -378,6 +398,7 @@ def create_table(dynamodb,Table_Name):
 
 
 def create_and_Loadtable(Table_Name,File_name):
+    global PrevKEY,LastRecord_tag,Helper_Table_dict
     #Helper Table must exists, now we need to check if the table already been fully loaded or not
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
     dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
@@ -436,10 +457,12 @@ def create_and_Loadtable(Table_Name,File_name):
                                           'NValue': Cur_index
                                           }
                                           )
+                    print("write first id {}\n".format(Cur_index))
+                    
                 Cur_index = Cur_index+1
                 row_id = row_id+1
                 
-                if row_id-1%5000 ==0:
+                if row_id%1000 ==0:
                     print("Added record:", Cur_index)
     
         helper_table.put_item(
@@ -481,6 +504,7 @@ def create_and_Loadtable(Table_Name,File_name):
             else:
                 firstid = response['Item']['NValue']
             print("firstid "+str(firstid))
+            print("LastLoaded_index "+str(Cur_index))
             row_id = 1
             table = dynamodb.Table(Table_Name)
             num_records = 0
@@ -495,8 +519,6 @@ def create_and_Loadtable(Table_Name,File_name):
                     if firstid+row_id<Cur_index:
                         row_id = row_id+1
                     else:
-                        if row_id == num_records:
-                            LastRecord_tag = True
                         load_BikeSharing_record(helper_table,table,record,Cur_index)
                         Cur_index = Cur_index+1
                         row_id = row_id+1
@@ -510,7 +532,7 @@ def create_and_Loadtable(Table_Name,File_name):
                                                             },
                                                             ReturnValues="UPDATED_NEW"
                                                             )
-                    if row_id%5000 ==0:
+                    if row_id%1000 ==0:
                         print("read record:", Cur_index)
 
             helper_table.put_item(
@@ -749,7 +771,22 @@ def create_HelperTable(Table_Name):
         print("Helper Table already been created\n")
 
 if __name__=="__main__":
-    RESET = True
+    
+    global PrevKEY,LastRecord_tag,Helper_Table_dict,Use_Local_Batch
+    Use_Local_Batch = True
+    PrevKEY = [];
+    LastRecord_tag = False;
+    Helper_Table_dict = {}
+    parser = argparse.ArgumentParser(description='-r to reset,-b to enable batch process')
+    parser.add_argument('-r', action='store_true')
+    parser.add_argument('-b', action='store_true')
+    args = parser.parse_args()
+    print(args)
+ 
+    RESET = args.r
+    Use_Local_Batch = args.b
+    print("RESET{}".format(RESET))
+    print("Use_Local_Batch{}".format(Use_Local_Batch))
     if RESET:
         dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
         dynamodb_client.delete_table(TableName="Bikesharing2010_batchHelperTable")
