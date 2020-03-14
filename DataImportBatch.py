@@ -185,7 +185,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                                      },
                                      ReturnValues="UPDATED_NEW"
                                      )
-            print("loaded last id is {}\n".format(PrevItem["lastid"]))
+            print("loaded last id is {}\n".format(CurItem["lastid"]))
     else:
         items = helper_table.query(KeyConditionExpression=Key('Key').eq(KEY))['Items']
         if not items:
