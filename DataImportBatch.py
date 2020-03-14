@@ -147,7 +147,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                                              ReturnValues="UPDATED_NEW"
                                              )
         else:
-            firstid = items[0]['firstid']
+            firstid = items['firstid']
             Item={
                   'Key': KEY,
                   'Value': "["+str(firstid)+"]["+str(Cur_index)+"]",
@@ -237,8 +237,8 @@ def create_MembershipDistribution(helper_table,Duration,KEY,Membertype):
                               }
                               )
         else:
-            mc = items[0]['MemberCounts']
-            cc = items[0]['CasualCounts']
+            mc = items['MemberCounts']
+            cc = items['CasualCounts']
             if ismember:
                 mc = mc+1
             else:
@@ -405,13 +405,17 @@ def create_and_Loadtable(Table_Name,File_name):
         row_id = 1
         table = dynamodb.Table(Table_Name)
         print("Start loading data")
+        num_records = 0
         with open(File_name) as csvFile:
             records = csv.DictReader(csvFile)
             num_records = len(list(records))
+    
+        with open(File_name) as csvFile:
+            records = csv.DictReader(csvFile)
             print("rows number is {}".format(num_records))
             for record in records:
                 if row_id == num_records:
-                    LastRecord_tag = True
+                   LastRecord_tag = True
                 load_BikeSharing_record(helper_table,table,record,Cur_index)
                 if not Use_Local_Batch:
                     helper_table.update_item(
@@ -479,10 +483,15 @@ def create_and_Loadtable(Table_Name,File_name):
             print("firstid "+str(firstid))
             row_id = 1
             table = dynamodb.Table(Table_Name)
+            num_records = 0
             with open(File_name) as csvFile:
                 records = csv.DictReader(csvFile)
                 num_records = len(list(records))
+            with open(File_name) as csvFile:
+                records = csv.DictReader(csvFile)
                 for record in records:
+                    if row_id == num_records:
+                        LastRecord_tag = True
                     if firstid+row_id<Cur_index:
                         row_id = row_id+1
                     else:
