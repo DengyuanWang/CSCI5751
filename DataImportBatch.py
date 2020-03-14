@@ -117,7 +117,7 @@ def create_MINMAX_duration(helper_table,Duration,KEY):
                                          ReturnValues="UPDATED_NEW"
                                          )
 
-def create_record_counts(helper_table,Duration,KEY,Cur_index):
+def create_record_counts(TableName,helper_table,Duration,KEY,Cur_index):
     global PrevKEY,LastRecord_tag,Helper_Table_dict
     KEY = KEY+"RecordsCounts"
     if Use_Local_Batch:
@@ -145,7 +145,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                                   )
                     helper_table.update_item(
                                              Key={
-                                             'Key': 'LastLoadedIndex'
+                                             'Key': TableName+'LastLoadedIndex'
                                              },
                                              UpdateExpression="set NValue = :val",
                                              ExpressionAttributeValues={
@@ -178,7 +178,7 @@ def create_record_counts(helper_table,Duration,KEY,Cur_index):
                           )
             helper_table.update_item(
                                      Key={
-                                     'Key': 'LastLoadedIndex'
+                                     'Key': TableName+'LastLoadedIndex'
                                      },
                                      UpdateExpression="set NValue = :val",
                                      ExpressionAttributeValues={
@@ -331,7 +331,7 @@ def create_MembershipDistribution(helper_table,Duration,KEY,Membertype):
                                      ReturnValues="UPDATED_NEW"
                                      )
 
-def load_BikeSharing_record(helper_table,table,record,Cur_index):
+def load_BikeSharing_record(TableName,helper_table,table,record,Cur_index):
     global PrevKEY,LastRecord_tag,Helper_Table_dict
     Index = Cur_index
     Duration = record['Duration']
@@ -361,7 +361,7 @@ def load_BikeSharing_record(helper_table,table,record,Cur_index):
     KEY = str(datetime_object.year)+"_"+str(datetime_object.month)+"_MIN_MAX"
     #print(KEY)
     create_MINMAX_duration(helper_table,Duration,KEY)
-    create_record_counts(helper_table,Duration,KEY,Cur_index)
+    create_record_counts(TableName,helper_table,Duration,KEY,Cur_index)
     create_MembershipDistribution(helper_table,Duration,KEY,Membertype)
     PrevKEY = KEY
 
@@ -439,11 +439,11 @@ def create_and_Loadtable(Table_Name,File_name):
             for record in records:
                 if row_id == num_records:
                    LastRecord_tag = True
-                load_BikeSharing_record(helper_table,table,record,Cur_index)
+                load_BikeSharing_record(TableName,helper_table,table,record,Cur_index)
                 if not Use_Local_Batch:
                     helper_table.update_item(
                                              Key={
-                                             'Key': 'LastLoadedIndex'
+                                             'Key': TableName+'LastLoadedIndex'
                                              },
                                              UpdateExpression="set NValue = NValue + :val",
                                              ExpressionAttributeValues={
@@ -521,12 +521,12 @@ def create_and_Loadtable(Table_Name,File_name):
                     if firstid+row_id<Cur_index:
                         row_id = row_id+1
                     else:
-                        load_BikeSharing_record(helper_table,table,record,Cur_index)
+                        load_BikeSharing_record(TableName,helper_table,table,record,Cur_index)
                         Cur_index = Cur_index+1
                         row_id = row_id+1
                         response = helper_table.update_item(
                                                             Key={
-                                                            'Key': 'LastLoadedIndex'
+                                                            'Key': TableName+'LastLoadedIndex'
                                                             },
                                                             UpdateExpression="set NValue = NValue + :val",
                                                             ExpressionAttributeValues={
