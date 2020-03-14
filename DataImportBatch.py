@@ -9,6 +9,7 @@ import csv
 from datetime import datetime
 import argparse
 
+import time
 
 '''
 thisdict = {
@@ -371,21 +372,13 @@ def create_table(dynamodb,Table_Name):
                                              {
                                              'AttributeName': 'Index',
                                              'KeyType': 'HASH'  #Partition key
-                                             },
-                                             {
-                                             'AttributeName': 'Startdate',
-                                             'KeyType': 'String'  #Sort key
                                              }
                                              ],
                                   AttributeDefinitions=[
                                                         {
                                                         'AttributeName': 'Index',
                                                         'AttributeType': 'N'
-                                                        },
-                                                        {
-                                                        'AttributeName': 'Startdate',
-                                                        'AttributeType': 'S'
-                                                        },
+                                                        }
                                                         
                                                         ],
                                   ProvisionedThroughput={
@@ -393,15 +386,24 @@ def create_table(dynamodb,Table_Name):
                                   'WriteCapacityUnits': 10
                                   }
                                   )
-        
+    
+    while table.table_status=="CREATING":
+        print("Table status:", table.table_status)
+        time.sleep(1)
+        table.reload()
     print("Table status:", table.table_status)
 
-
 def create_and_Loadtable(Table_Name,File_name):
-    global PrevKEY,LastRecord_tag,Helper_Table_dict
+    global PrevKEY,LastRecord_tag,Helper_Table_dict,StoreOnline
     #Helper Table must exists, now we need to check if the table already been fully loaded or not
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
-    dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
+    if StoreOnline:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+        dynamodb_client = boto3.client('dynamodb',region_name='us-west-2')
+    
+    else:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
+        dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
+    
     existing_tables = dynamodb_client.list_tables()['TableNames']
     print(existing_tables)
     helper_table = dynamodb.Table(Table_Name+'HelperTable')
@@ -554,7 +556,7 @@ def create_and_Loadtable(Table_Name,File_name):
 '''
 
 
-def test_query():
+def test_query(TableName):
     '''
         s3 = boto3.resource('s3')
         for bucket in s3.buckets.all():
@@ -562,13 +564,17 @@ def test_query():
         '''
     # Get the service resource.#
     #dynamodb = boto3.resource('dynamodb')
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
+    global StoreOnline
+    if StoreOnline:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    else:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
     # Instantiate a table resource object without actually
     # creating a DynamoDB table. Note that the attributes of this table
     # are lazy-loaded: a request is not made nor are the attribute
     # values populated until the attributes
     # on the table resource are accessed or its load() method is called.
-    table = dynamodb.Table('Bikesharing2010')
+    table = dynamodb.Table(TableName)
     
     # Print out some data about the table.
     # This will cause a request to be made to DynamoDB and its attribute
@@ -584,7 +590,11 @@ def test_query():
 def create_secondaryIndex(TableName):
     # Boto3 is the AWS SDK library for Python.
     # You can use the low-level client to make API calls to DynamoDB.
-    client = boto3.client('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
+    global StoreOnline
+    if StoreOnline:
+        client = boto3.client('dynamodb', region_name='us-west-2')
+    else:
+        client = boto3.client('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
     
     try:
         resp = client.update_table(
@@ -705,19 +715,23 @@ def create_secondaryIndex(TableName):
         print("Error updating table:")
         print(e)
 
-def query_secondray_index():
+def query_secondray_index(TableName):
     # Boto3 is the AWS SDK library for Python.
     # The "resources" interface allows for a higher-level abstraction than the low-level client interface.
     # For more details, go to http://boto3.readthedocs.io/en/latest/guide/resources.html
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
-    table = dynamodb.Table('Bikesharing2010')
+    global StoreOnline
+    if StoreOnline:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    else:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
+    table = dynamodb.Table(TableName)
     
     # When adding a global secondary index to an existing table, you cannot query the index until it has been backfilled.
     # This portion of the script waits until the index is in the “ACTIVE” status, indicating it is ready to be queried.
     while True:
         if not table.global_secondary_indexes or table.global_secondary_indexes[0]['IndexStatus'] != 'ACTIVE':
             print('Waiting for index to backfill...')
-            time.sleep(5)
+            time.sleep(1)
             table.reload()
         else:
             break
@@ -733,10 +747,17 @@ def query_secondray_index():
     print("The query returned the following items:")
     for item in resp['Items']:
         print(item)
+        
 def create_HelperTable(Table_Name):
     #create helper table if HelperTable not exists
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
-    dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
+    global StoreOnline
+    if StoreOnline:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+        dynamodb_client = boto3.client('dynamodb',region_name='us-west-2')
+    else:
+        dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
+        dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
+    
     table_name = Table_Name+'HelperTable'
     existing_tables = dynamodb_client.list_tables()['TableNames']
     if table_name not in existing_tables:
@@ -760,6 +781,11 @@ def create_HelperTable(Table_Name):
                                                 TableName=table_name
                                                 )
         helper_table = dynamodb.Table(table_name)
+        while helper_table.table_status=="CREATING":
+            print("Table status:", helper_table.table_status)
+            time.sleep(1)
+            helper_table.reload()
+        print("Table status:", helper_table.table_status)
         helper_table.put_item(
                        Item={
                        'Key': 'LastLoadedIndex',
@@ -772,7 +798,7 @@ def create_HelperTable(Table_Name):
 
 if __name__=="__main__":
     
-    global PrevKEY,LastRecord_tag,Helper_Table_dict,Use_Local_Batch
+    global PrevKEY,LastRecord_tag,Helper_Table_dict,Use_Local_Batch,StoreOnline
     Use_Local_Batch = True
     PrevKEY = [];
     LastRecord_tag = False;
@@ -780,15 +806,21 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description='-r to reset,-b to enable batch process')
     parser.add_argument('-r', action='store_true')
     parser.add_argument('-b', action='store_true')
+    parser.add_argument('-o', action='store_true')
     args = parser.parse_args()
     print(args)
  
     RESET = args.r
     Use_Local_Batch = args.b
+    StoreOnline = args.o
     print("RESET{}".format(RESET))
     print("Use_Local_Batch{}".format(Use_Local_Batch))
+    print("StoreOnline{}".format(StoreOnline))
     if RESET:
-        dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
+        if StoreOnline:
+            dynamodb_client = boto3.client('dynamodb',region_name='us-west-2')
+        else:
+            dynamodb_client = boto3.client('dynamodb',region_name='us-west-2', endpoint_url="http://localhost:8000")
         dynamodb_client.delete_table(TableName="Bikesharing2010_batchHelperTable")
         dynamodb_client.delete_table(TableName="Bikesharing2010_batch")
     
@@ -798,6 +830,6 @@ if __name__=="__main__":
     create_HelperTable(Table_Name)
     create_and_Loadtable(Table_Name,File_name)
     #create_secondaryIndex(Table_Name)
-    #test_query()
-    #query_secondray_index()
+    #test_query(TableName)
+    #query_secondray_index(TableName)
 
