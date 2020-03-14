@@ -439,7 +439,7 @@ def create_and_Loadtable(Table_Name,File_name):
             for record in records:
                 if row_id == num_records:
                    LastRecord_tag = True
-                load_BikeSharing_record(TableName,helper_table,table,record,Cur_index)
+                load_BikeSharing_record(Table_Name,helper_table,table,record,Cur_index)
                 if not Use_Local_Batch:
                     helper_table.update_item(
                                              Key={
@@ -521,12 +521,12 @@ def create_and_Loadtable(Table_Name,File_name):
                     if firstid+row_id<Cur_index:
                         row_id = row_id+1
                     else:
-                        load_BikeSharing_record(TableName,helper_table,table,record,Cur_index)
+                        load_BikeSharing_record(Table_Name,helper_table,table,record,Cur_index)
                         Cur_index = Cur_index+1
                         row_id = row_id+1
                         response = helper_table.update_item(
                                                             Key={
-                                                            'Key': TableName+'LastLoadedIndex'
+                                                            'Key': Table_Name+'LastLoadedIndex'
                                                             },
                                                             UpdateExpression="set NValue = NValue + :val",
                                                             ExpressionAttributeValues={
